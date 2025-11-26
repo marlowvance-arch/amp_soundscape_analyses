@@ -1,0 +1,64 @@
+amp_soundscape_analyses/
+│
+├── amp_soundscape_analyses.Rproj
+├── config.yaml                      <-- global pipeline configuration
+├── .Rprofile                        <-- auto-load config + helper paths
+├── Makefile                         <-- 1-click pipeline runner
+├── renv.lock                        <-- reproducible R package versions
+├── renv/                            <-- renv library folder
+│
+├── environments/                    <-- Python environments (CUDA-enabled)
+│    ├── env_indices.yml
+│    ├── env_saturation.yml
+│    ├── env_fcspec.yml
+│
+├── pipelines/                       <-- one wrapper script per pipeline
+│    ├── run_indices.R
+│    ├── run_saturation.R
+│    ├── run_stats.R
+│    ├── run_falsecolor.R
+│    ├── run_mapping.R
+│
+├── scripts/
+│    ├── python/
+│    │    ├── indices.py
+│    │    ├── saturation.py
+│    │    ├── false_color.py
+│    │
+│    ├── R/
+│         ├── statistics.R
+│         ├── mapping.R
+│
+├── metadata/
+|     |--- "global_flags_summary.csv"
+|     |--- "static_serial_metatdata.csv"
+|
+|
+├── raw_audio/
+|     |--- Site_1/
+|     |--- Site_2/
+|     |--- Site_3/
+|     |--- Site_4/
+|     |--- Site_5/
+|     |--- Site_6/
+|     |--- Site_7/
+|     
+├── Data/
+|     |--- indices/
+|     |--- saturation/
+|     |--- false_color/
+|     |--- anova/
+|     |--- Kruskal/
+|     |--- rm_anova/
+|     |--- gamm/
+|     |--- glmm/
+|     |--- nmds/
+|     |--- pca/
+|     |--- permanova/
+|     |--- simper/
+|     |--- soundscape_saturation/
+|     |--- z_score/
+|
+├── plots/
+├── maps/
+└── logs/

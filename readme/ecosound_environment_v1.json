@@ -1,0 +1,74 @@
+{
+  "version": "1.0",
+  "version_name": "ecosound_environment_v1",
+  "description": "Unified GPU-enabled ecoacoustics environment for Florida Everglades Soundscape Project. Built on Python 3.10, CuPy CUDA12x, and PyTorch CUDA 12.1. Supports GPU-accelerated acoustic indices, spectrogram generation, and CNN-based species detection.",
+  "system": {
+    "os": "Windows 10/11",
+    "architecture": "x86_64",
+    "gpu": "NVIDIA GeForce RTX 3050 Laptop GPU",
+    "nvidia_driver_cuda_runtime": "12.5",
+    "cuda_toolkit_installed": false
+  },
+  "python": {
+    "version": "3.10",
+    "environment_name": "ecosound",
+    "path": "C:/Users/rockn/miniconda3/envs/ecosound/python.exe"
+  },
+  "reticulate": {
+    "binding_method": "use_python",
+    "binding_path": "C:/Users/rockn/miniconda3/envs/ecosound/python.exe",
+    "status": "required_true"
+  },
+  "gpu_libraries": {
+    "cupy": {
+      "package": "cupy-cuda12x",
+      "gpu_enabled": true,
+      "tested_gpu": "NVIDIA GeForce RTX 3050 Laptop GPU",
+      "notes": "Uses CUDA runtime from NVIDIA driver; CUDA_PATH warning expected on Windows."
+    },
+    "pytorch": {
+      "installer": "pip",
+      "install_command": "pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121",
+      "gpu_enabled": true,
+      "cuda_version": "12.1",
+      "detected_gpu": "NVIDIA GeForce RTX 3050 Laptop GPU"
+    }
+  },
+  "audio_stack": {
+    "librosa": "conda-forge",
+    "pysoundfile": "pip",
+    "audioread": "conda-forge",
+    "resampy": "pip"
+  },
+  "scientific_stack": {
+    "numpy": "conda-forge",
+    "scipy": "conda-forge",
+    "pandas": "conda-forge",
+    "matplotlib": "conda-forge",
+    "numba": "conda-forge",
+    "scikit-learn": "pip",
+    "h5py": "pip",
+    "seaborn": "pip"
+  },
+  "config_libraries": {
+    "pyyaml": "conda-forge",
+    "tqdm": "pip"
+  },
+  "ecoacoustics_usage": {
+    "indices": "GPU-accelerated using CuPy",
+    "saturation": "GPU-accelerated using CuPy",
+    "false_color": "GPU-accelerated using CuPy",
+    "cnn_species_detection": "GPU-accelerated using PyTorch",
+    "stft_preprocessing": "GPU-accelerated using CuPy",
+    "notes": "All pipelines operated under the ecosound environment to ensure reproducibility."
+  },
+  "metadata": {
+    "created": "2025-02-25",
+    "created_by": "Soundscape Ecologist GPT",
+    "notes": [
+      "Only Python 3.10 supports CuPy GPU wheels on Windows.",
+      "ecosound is the unified environment replacing env_indices, env_saturation, env_falsecolor, and env_species.",
+      "Environment designed for SM4 stereo ecoacoustics pipelines and Everglades long-term monitoring."
+    ]
+  }
+}

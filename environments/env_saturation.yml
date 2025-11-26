@@ -1,0 +1,13 @@
+name: env_saturation
+channels:
+  - conda-forge
+  - pytorch
+dependencies:
+  - python=3.11
+  - pytorch
+  - torchaudio
+  - cudatoolkit
+  - numpy
+  - scipy
+  - pandas
+  - pyyaml

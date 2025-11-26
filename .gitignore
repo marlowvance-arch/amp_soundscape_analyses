@@ -1,0 +1,16 @@
+﻿.Rproj.user/
+.Rhistory
+.RData
+.RDataTmp*
+renv/library/
+renv/staging/
+raw_audio/
+data/
+plots/
+maps/
+logs/
+cnn/models/
+cnn/logs/
+*.WAV
+*.wav
+*.Rproj

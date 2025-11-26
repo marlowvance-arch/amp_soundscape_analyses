@@ -1,0 +1,510 @@
+#!/usr/bin/env Rscript
+
+# =====================================================================
+# Everglades Soundscape Dashboard (Unified ecosound GPU Version)
+# =====================================================================
+
+library(shiny)
+library(shinydashboard)
+library(shinyWidgets)
+library(yaml)
+library(tidyverse)
+library(fs)
+library(rprojroot)
+library(reticulate)
+
+# =====================================================================
+# PROJECT ROOT DETECTION
+# =====================================================================
+
+project_root <- find_root(has_file("config/config.yml"))
+setwd(project_root)
+message("Project root set to: ", project_root)
+
+# =====================================================================
+# SAFE YAML HELPERS
+# =====================================================================
+
+safe_read_yaml <- function(path) {
+  if (!file.exists(path)) {
+    warning("YAML missing: ", path)
+    return(list())
+  }
+  tryCatch(
+    yaml::read_yaml(path),
+    error = function(e) {
+      warning("Failed to read YAML: ", path, " — ", e$message)
+      list()
+    }
+  )
+}
+
+load_global_config <- function() {
+  cfg <- safe_read_yaml("config/config.yml")
+  
+  # Ensure sub-lists exist
+  if (is.null(cfg$analysis)) cfg$analysis <- list()
+  if (is.null(cfg$analysis$indices)) cfg$analysis$indices <- list()
+  
+  # Default index parameters
+  defaults <- list(
+    window_seconds = 60,
+    fft_size = 1024,
+    overlap = 0.5,
+    bio_low = 200,
+    bio_high = 8000,
+    anthro_low = 20,
+    anthro_high = 200,
+    indices_to_compute = c(
+      "AEI","ADI","ACI","BI","NDSI","SSI",
+      "spectral_entropy","temporal_entropy","total_entropy","ZCR"
+    )
+  )
+  
+  for (k in names(defaults)) {
+    if (is.null(cfg$analysis$indices[[k]]))
+      cfg$analysis$indices[[k]] <- defaults[[k]]
+  }
+  
+  return(cfg)
+}
+
+save_global_config <- function(cfg) {
+  yaml::write_yaml(cfg, "config/config.yml")
+}
+
+load_stats_params <- function() {
+  safe_read_yaml("config/stats_params.yml")
+}
+
+save_stats_params <- function(p) {
+  yaml::write_yaml(p, "config/stats_params.yml")
+}
+
+load_species_params <- function() {
+  safe_read_yaml("config/species_params.yml")
+}
+
+# Optional naming helper
+if (file.exists("scripts/naming_helpers.R")) {
+  source("scripts/naming_helpers.R")
+}
+
+# =====================================================================
+# INITIAL CONFIG
+# =====================================================================
+
+cfg <- load_global_config()
+stats_params <- load_stats_params()
+
+site_choices <- paste0("Site_", 1:7)
+default_indices <- cfg$analysis$indices$indices_to_compute
+
+# =====================================================================
+# GPU / PYTHON ENV DIAGNOSTICS
+# =====================================================================
+
+get_python_env_report <- function() {
+  out <- capture.output({
+    cat("Python Path:\n")
+    print(reticulate::py_config()$python)
+    
+    cat("\nPython Version:\n")
+    print(reticulate::py_config()$version)
+    
+    cat("\nCUDA / GPU Status:\n")
+    try({
+      reticulate::py_run_string("import cupy as cp; gpu = cp.cuda.runtime.getDeviceProperties(0)['name']")
+      gpu_name <- reticulate::py_eval("gpu.decode()")
+      cat("CuPy GPU: ", gpu_name, "\n", sep="")
+    }, silent = TRUE)
+    
+    try({
+      reticulate::py_run_string("import torch; t = torch.cuda.is_available()")
+      torch_avail <- reticulate::py_eval("t")
+      if (torch_avail) {
+        reticulate::py_run_string("import torch; n = torch.cuda.get_device_name(0)")
+        name <- reticulate::py_eval("n")
+        cat("Torch GPU: ", name, "\n", sep="")
+      } else {
+        cat("Torch GPU: Not Available (Using CPU)\n")
+      }
+    }, silent = TRUE)
+    
+  })
+  paste(out, collapse="\n")
+}
+
+# =====================================================================
+# UI
+# =====================================================================
+
+header <- dashboardHeader(title = "Everglades Soundscape Dashboard")
+
+sidebar <- dashboardSidebar(
+  sidebarMenu(
+    menuItem("Run Pipelines", tabName = "run", icon = icon("play")),
+    menuItem("Indices Settings", tabName = "indices", icon = icon("sliders")),
+    menuItem("Visualize Results", tabName = "viz", icon = icon("chart-area")),
+    menuItem("Environment Status", tabName = "env", icon = icon("microchip"))
+  )
+)
+
+body <- dashboardBody(
+  
+  tabItems(
+    
+    # ---------------------------------------------------------
+    # RUN TAB
+    # ---------------------------------------------------------
+    tabItem(
+      tabName = "run",
+      fluidRow(
+        box(
+          width = 4,
+          title = "Pipeline Controls",
+          status = "primary",
+          solidHeader = TRUE,
+          
+          pickerInput(
+            "pipeline",
+            "Select Pipeline:",
+            choices = c(
+              "Indices" = "indices",
+              "Soundscape Saturation" = "saturation",
+              "Statistics" = "stats",
+              "False-color Spectrograms" = "falsecolor",
+              "Spatial Mapping" = "mapping",
+              "Species CNN Inference" = "species"
+            )
+          ),
+          
+          pickerInput(
+            "sites",
+            "Select Sites:",
+            choices = site_choices,
+            multiple = TRUE,
+            options = pickerOptions(actionsBox = TRUE),
+            selected = site_choices
+          ),
+          
+          dateRangeInput("dates", "Select Date Range:",
+                         start = Sys.Date() - 30,
+                         end = Sys.Date()),
+          
+          conditionalPanel(
+            condition = "input.pipeline == 'stats'",
+            pickerInput(
+              "stats_tests",
+              "Statistical Tests:",
+              choices = stats_params$stats$use_tests,
+              multiple = TRUE,
+              options = pickerOptions(actionsBox = TRUE),
+              selected = stats_params$stats$use_tests
+            )
+          ),
+          
+          actionButton("run_pipeline", "Run Pipeline", class = "btn-primary btn-lg")
+        ),
+        
+        box(
+          width = 8,
+          title = "Pipeline Status",
+          status = "info",
+          solidHeader = TRUE,
+          
+          uiOutput("pipeline_summary"),
+          br(),
+          uiOutput("progress_ui"),
+          br(),
+          h4("Log Output"),
+          verbatimTextOutput("run_log", placeholder = TRUE)
+        )
+      )
+    ),
+    
+    # ---------------------------------------------------------
+    # INDICES SETTINGS TAB
+    # ---------------------------------------------------------
+    tabItem(
+      tabName = "indices",
+      fluidRow(
+        box(
+          width = 4,
+          title = "Indices Configuration",
+          status = "primary",
+          solidHeader = TRUE,
+          
+          numericInput("idx_window", "Window (sec):", cfg$analysis$indices$window_seconds),
+          numericInput("idx_fft", "FFT size:", cfg$analysis$indices$fft_size),
+          sliderInput("idx_overlap", "Overlap:", 0, 0.95, cfg$analysis$indices$overlap),
+          
+          numericInput("bio_low", "Bioacoustic low (Hz):", cfg$analysis$indices$bio_low),
+          numericInput("bio_high","Bioacoustic high (Hz):", cfg$analysis$indices$bio_high),
+          numericInput("anthro_low","Anthrophony low (Hz):", cfg$analysis$indices$anthro_low),
+          numericInput("anthro_high","Anthrophony high (Hz):", cfg$analysis$indices$anthro_high),
+          
+          checkboxGroupInput(
+            "indices_to_compute",
+            "Indices to Compute:",
+            choices = default_indices,
+            selected = cfg$analysis$indices$indices_to_compute
+          ),
+          
+          actionButton("save_indices_cfg", "Save", class = "btn-success")
+        ),
+        
+        box(
+          width = 8,
+          title = "Current Indices Config",
+          status = "info",
+          solidHeader = TRUE,
+          verbatimTextOutput("indices_cfg_view")
+        )
+      )
+    ),
+    
+    # ---------------------------------------------------------
+    # VISUALIZATION TAB
+    # ---------------------------------------------------------
+    tabItem(
+      tabName = "viz",
+      fluidRow(
+        
+        box(
+          width = 4,
+          title = "Select Data",
+          status = "primary",
+          solidHeader = TRUE,
+          
+          selectInput(
+            "viz_type",
+            "Result Type:",
+            choices = c(
+              "Indices" = "indices",
+              "Saturation" = "saturation",
+              "Statistics" = "stats"
+            )
+          ),
+          
+          uiOutput("viz_file_selector"),
+          uiOutput("viz_column_selector")
+        ),
+        
+        box(
+          width = 8,
+          title = "Plots",
+          status = "info",
+          solidHeader = TRUE,
+          
+          tabsetPanel(
+            tabPanel("Time Series", plotOutput("plot_timeseries")),
+            tabPanel("Heatmap", plotOutput("plot_heatmap"))
+          )
+        )
+      )
+    ),
+    
+    # ---------------------------------------------------------
+    # ENVIRONMENT STATUS TAB
+    # ---------------------------------------------------------
+    tabItem(
+      tabName = "env",
+      fluidRow(
+        box(
+          width = 12,
+          title = "Python / GPU Environment Details",
+          status = "primary",
+          solidHeader = TRUE,
+          verbatimTextOutput("env_status")
+        )
+      )
+    )
+    
+  ) # END tabItems
+)
+
+ui <- dashboardPage(header, sidebar, body, skin = "green")
+
+# =====================================================================
+# SERVER
+# =====================================================================
+
+server <- function(input, output, session) {
+  
+  # ---------------------------------------------------------
+  # Environment Status
+  # ---------------------------------------------------------
+  output$env_status <- renderPrint({
+    get_python_env_report()
+  })
+  
+  # ---------------------------------------------------------
+  # Pipeline Summary
+  # ---------------------------------------------------------
+  output$pipeline_summary <- renderUI({
+    req(input$pipeline)
+    tagList(
+      h4("Pipeline Overview"),
+      p(strong("Pipeline: "), input$pipeline),
+      p(strong("Sites: "), paste(input$sites, collapse = ", ")),
+      p(strong("Date Range: "),
+        paste(as.character(input$dates), collapse = " → "))
+    )
+  })
+  
+  # ---------------------------------------------------------
+  # Run Pipeline Logic
+  # ---------------------------------------------------------
+  
+  progress_reactive <- reactiveVal(NULL)
+  log_reactive <- reactiveVal("")
+  
+  output$progress_ui <- renderUI(progress_reactive())
+  output$run_log <- renderText(log_reactive())
+  
+  observeEvent(input$run_pipeline, {
+    
+    pipeline <- input$pipeline
+    log_text <- paste0("Running pipeline: ", pipeline, "\n")
+    log_reactive(log_text)
+    
+    # Save stats selections
+    if (pipeline == "stats") {
+      sp <- load_stats_params()
+      sp$stats$use_tests <- input$stats_tests
+      save_stats_params(sp)
+    }
+    
+    wrapper_script <- cfg$pipelines[[pipeline]]$wrapper
+    
+    withProgress(message = paste("Running", pipeline), value = 0, {
+      
+      incProgress(0.3)
+      progress_reactive(tags$div(class="progress-bar", style="width:30%", "Starting..."))
+      
+      tryCatch({
+        
+        # ✔ Provide required variables for wrappers
+        sites <- input$sites
+        dates <- as.character(input$dates)
+        
+        incProgress(0.5)
+        progress_reactive(tags$div(class="progress-bar", style="width:80%", "Processing..."))
+        
+        source(wrapper_script)
+        
+        incProgress(0.2)
+        progress_reactive(tags$div(
+          class="progress-bar progress-bar-success",
+          style="width:100%",
+          "Complete"
+        ))
+        
+        log_reactive(paste0(log_text, "\nCompleted.\n"))
+        
+      }, error = function(e) {
+        
+        progress_reactive(tags$div(
+          class="progress-bar progress-bar-danger",
+          style="width:100%",
+          "Error"
+        ))
+        
+        log_reactive(paste0(log_text, "\nERROR: ", e$message))
+      })
+      
+    })
+  })
+  
+  # ---------------------------------------------------------
+  # Save Index Config
+  # ---------------------------------------------------------
+  observeEvent(input$save_indices_cfg, {
+    cfg_local <- load_global_config()
+    
+    cfg_local$analysis$indices$window_seconds <- input$idx_window
+    cfg_local$analysis$indices$fft_size <- input$idx_fft
+    cfg_local$analysis$indices$overlap <- input$idx_overlap
+    cfg_local$analysis$indices$bio_low <- input$bio_low
+    cfg_local$analysis$indices$bio_high <- input$bio_high
+    cfg_local$analysis$indices$anthro_low <- input$anthro_low
+    cfg_local$analysis$indices$anthro_high <- input$anthro_high
+    cfg_local$analysis$indices$indices_to_compute <- input$indices_to_compute
+    
+    save_global_config(cfg_local)
+    showNotification("Saved indices config.", type = "message")
+  })
+  
+  output$indices_cfg_view <- renderPrint({
+    cfg_now <- load_global_config()
+    cfg_now$analysis$indices
+  })
+  
+  # ---------------------------------------------------------
+  # Visualization Panels
+  # ---------------------------------------------------------
+  
+  output$viz_file_selector <- renderUI({
+    folder <- file.path(
+      cfg$paths$data,
+      cfg$paths$data_subfolders[[input$viz_type]]
+    )
+    files <- dir_ls(folder, glob = "*.csv")
+    selectInput("viz_file", "Select file:", choices = basename(files))
+  })
+  
+  output$viz_column_selector <- renderUI({
+    req(input$viz_file)
+    
+    df <- read_csv(
+      file.path(cfg$paths$data,
+                cfg$paths$data_subfolders[[input$viz_type]],
+                input$viz_file),
+      show_col_types = FALSE
+    )
+    
+    numeric_cols <- names(df)[sapply(df, is.numeric)]
+    
+    tagList(
+      selectInput("viz_x", "X Axis:", choices = names(df)),
+      selectInput("viz_y", "Y Axis:", choices = numeric_cols)
+    )
+  })
+  
+  output$plot_timeseries <- renderPlot({
+    req(input$viz_file, input$viz_x, input$viz_y)
+    
+    df <- read_csv(
+      file.path(cfg$paths$data,
+                cfg$paths$data_subfolders[[input$viz_type]],
+                input$viz_file),
+      show_col_types = FALSE
+    )
+    
+    ggplot(df, aes_string(input$viz_x, input$viz_y)) +
+      geom_line() +
+      theme_minimal()
+  })
+  
+  output$plot_heatmap <- renderPlot({
+    req(input$viz_file, input$viz_x, input$viz_y)
+    
+    df <- read_csv(
+      file.path(cfg$paths$data,
+                cfg$paths$data_subfolders[[input$viz_type]],
+                input$viz_file),
+      show_col_types = FALSE
+    )
+    
+    ggplot(df, aes_string(input$viz_x, input$viz_y)) +
+      geom_bin2d() +
+      theme_minimal()
+  })
+}
+
+# =====================================================================
+# LAUNCH APP
+# =====================================================================
+
+shinyApp(ui = ui, server = server)

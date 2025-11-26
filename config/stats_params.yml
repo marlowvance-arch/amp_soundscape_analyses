@@ -1,0 +1,80 @@
+stats:
+  use_tests:
+    - anova
+    - kruskal
+    - rm_anova
+    - pca
+    - nmds
+    - permanova
+    - simper
+    - z_score
+    - pearson
+    - regression
+    - gamm
+    - glmm
+    - bayesian
+
+  anova:
+    p_adjust: "bonferroni"
+
+  kruskal:
+    p_adjust: "holm"
+
+  rm_anova:
+    id_column: "Site"
+    time_column: "Hour"
+    within_factor: "Hour"
+    between_factor: "Site"
+    p_adjust: "bonferroni"
+  
+  pca:
+    scale: true
+    center: true
+    components: 3
+
+  nmds:
+    distance: "bray"
+    dimensions: 2
+    trymax: 200
+
+  permanova:
+    permutations: 999
+    distance: "bray"
+
+  simper:
+    permutations: 999
+    distance: "bray"
+    contribution_threshold: 0.7   # proportion cutoff
+
+  z_score:
+    center: true
+    scale: true
+
+  pearson:
+    method: "pearson"
+    adjust: "holm"
+
+  regression:
+    include_interactions: true
+    family: "gaussian"
+
+  gamm:
+    smooth_k: 20
+    family: "gaussian"
+    correlation_structure: "ar1"
+    random_effects:
+      - "Site"
+
+  glmm:
+    family: "poisson"
+    random_effects:
+      - "Site"
+      - "Month"
+
+  bayesian:
+    chains: 3
+    iter: 2000
+    warmup: 1000
+    cores: 4
+    adapt_delta: 0.9
+    max_treedepth: 12

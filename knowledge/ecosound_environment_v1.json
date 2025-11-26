@@ -1,0 +1,58 @@
+{
+  "version": "1.0",
+  "version_name": "ecosound_environment_v1",
+  "description": "Unified GPU-enabled ecoacoustics environment for the Florida Everglades Soundscape Monitoring Project.",
+  "system": {
+    "os": "Windows 10/11",
+    "architecture": "x86_64",
+    "gpu": "NVIDIA GeForce RTX 3050 Laptop GPU",
+    "nvidia_driver_cuda_runtime": "12.5",
+    "cuda_toolkit_installed": false
+  },
+  "python": {
+    "version": "3.10",
+    "environment_name": "ecosound",
+    "path": "C:/Users/rockn/miniconda3/envs/ecosound/python.exe"
+  },
+  "reticulate": {
+    "binding_method": "use_python",
+    "binding_path": "C:/Users/rockn/miniconda3/envs/ecosound/python.exe",
+    "status": "required_true"
+  },
+  "gpu_libraries": {
+    "cupy": {
+      "package": "cupy-cuda12x",
+      "gpu_enabled": true,
+      "tested_gpu": "NVIDIA GeForce RTX 3050 Laptop GPU"
+    },
+    "pytorch": {
+      "installer": "pip",
+      "install_command": "pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121",
+      "gpu_enabled": true,
+      "cuda_version": "12.1",
+      "detected_gpu": "NVIDIA GeForce RTX 3050 Laptop GPU"
+    }
+  },
+  "audio_stack": {
+    "librosa": "conda-forge",
+    "pysoundfile": "pip",
+    "audioread": "conda-forge"
+  },
+  "python_scripts": [
+    "indices.py",
+    "saturation.py",
+    "false_color.py",
+    "species_cnn.py"
+  ],
+  "r_wrappers": [
+    "run_indices.R",
+    "run_saturation.R",
+    "run_falsecolor.R",
+    "run_species.R"
+  ],
+  "shiny_app": "app.R",
+  "metadata": {
+    "created": "2025-02-26",
+    "created_by": "Soundscape Ecologist GPT"
+  }
+}

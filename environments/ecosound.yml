@@ -1,0 +1,41 @@
+name: ecosound
+channels:
+  - conda-forge
+  - nvidia
+  - defaults
+
+dependencies:
+  # ---- Core Python ----
+  - python=3.10
+
+  # ---- Scientific stack ----
+  - numpy
+  - scipy
+  - pandas
+  - matplotlib
+  - numba
+
+  # ---- Audio stack ----
+  - librosa
+  - audioread
+  - pip
+
+  # ---- YAML + config ----
+  - pyyaml
+
+  - pip:
+      # ---- GPU CuPy (CUDA 12.x runtime compatible) ----
+      - cupy-cuda12x
+
+      # ---- Audio backend ----
+      - pysoundfile
+
+      # ---- Machine learning ----
+      # Torch GPU will be installed manually after env creation
+
+      # ---- Utils ----
+      - tqdm
+      - resampy
+      - scikit-learn
+      - h5py
+      - seaborn

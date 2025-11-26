@@ -1,0 +1,14 @@
+name: env_species
+channels:
+  - conda-forge
+  - pytorch
+dependencies:
+  - python=3.11
+  - pytorch
+  - torchaudio
+  - cudatoolkit
+  - numpy
+  - scipy
+  - pandas
+  - scikit-learn
+  - pyyaml

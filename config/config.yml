@@ -1,0 +1,158 @@
+project:
+  name: amp_soundscape_analyses
+  root: amp_soundscape_analyses
+
+paths:
+  data: data
+  data_subfolders:
+    indices: indices
+    soundscape_saturation: soundscape_saturation
+    false_color: false_color
+    species_id: species_id
+    anova: anova
+    kruskal: kruskal
+    rm_anova: rm_anova
+    gamm: gamm
+    glmm: glmm
+    nmds: nmds
+    pca: pca
+    permanova: permanova
+    simper: simper
+    z_score: z-score
+    regression: regression
+    pearson: pearson
+    bayesian: bayesian
+  metadata: metadata
+  metadata_files:
+    static_serial: metadata/static_serial_metadata.csv
+    global_flags_summary: metadata/global_flags_summary.csv
+    site_hour_blocs: metadata/site_hour_blocs.csv
+  raw_audio: raw_audio
+  scripts: scripts
+  pipelines: pipelines
+  plots: plots
+  maps: maps
+  logs: logs
+  cnn: cnn
+  config: config
+
+site:
+  folder_prefix: Site_
+  id_pattern: ^Site_[1-7]$
+
+python:
+  python:
+  env_indices: ecosound
+  env_saturation: ecosound
+  env_falsecolor: ecosound
+  env_species: ecosound
+
+  path: "C:/Users/rockn/miniconda3/envs/ecosound/python.exe"
+  python_version: "3.10"
+
+gpu:
+  use_gpu: yes
+  device_id: 0
+  backend: torch                        # torch GPU enabled; CuPy auto-detected
+  cuda_version: "12.x"
+
+analysis:
+  indices:
+    window_seconds: 60
+    fft_size: 1024
+    overlap: 0.5
+    bio_low: 200
+    bio_high: 8000
+    anthro_low: 20
+    anthro_high: 200
+    indices_to_compute:
+      - AEI
+      - ADI
+      - ACI
+      - BI
+      - NDSI
+      - SSI
+      - spectral_entropy
+      - temporal_entropy
+      - total_entropy
+      - ZCR
+
+  saturation:
+    n_bins: 64
+    threshold: 0.8
+    smooth: yes
+    smooth_k: 7
+
+  false_color:
+    window_seconds: 300
+    indices:
+      - ACI
+      - BIO
+      - NDSI
+    cmap: viridis
+
+pipelines:
+  indices:
+    wrapper: pipelines/run_indices.R
+    script: scripts/indices.py
+    output_folder: data/indices
+
+  saturation:
+    wrapper: pipelines/run_saturation.R
+    script: scripts/saturation.py
+    output_folder: data/soundscape_saturation
+
+  stats:
+    wrapper: pipelines/run_stats.R
+    script: scripts/statistics.R
+
+  false_color:
+    wrapper: pipelines/run_falsecolor.R
+    script: scripts/false_color.py
+    output_folder: data/false_color
+
+  mapping:
+    wrapper: pipelines/run_mapping.R
+    script: scripts/mapping.R
+    output_folder: maps
+
+  species:
+    wrapper: pipelines/run_species.R
+    script: scripts/species_cnn.py
+    params: config/species_params.yml
+    output_folder: data/species_id
+
+filename_rules:
+  sm4_wav:
+    description: Wildlife Acoustics SM4 naming convention <SERIAL>_<YYYYMMDD>_<HHMMSS>.WAV
+    required_extension:
+      - .wav
+      - .WAV
+    components:
+      serial:
+        pattern: ^[A-Za-z0-9]+$
+      date:
+        pattern: ^[0-9]{8}$
+        format: YYYYMMDD
+      time:
+        pattern: ^[0-9]{6}$
+        format: HHMMSS
+    delimiter: _
+    allow_extra_underscores: no
+    allow_lowercase_extension: yes
+    validate_on_load: yes
+    example: S4A25468_20240509_110103.WAV
+    nonconforming_handling:
+      flag_invalid_files: yes
+      write_diagnostic_table: logs/nonconforming_filenames.csv
+
+naming:
+  single_site:
+    pattern: site_<SITE>_<TEST>_<DATE_RANGE>
+  single_site_aggregated:
+    pattern: site_<SITE>_<TEST>_<AGG>_<DATE_RANGE>
+  multi_site:
+    pattern: sites_<SITE_LIST>_<TEST>_<DATE_RANGE>
+  all_sites:
+    pattern: all_<TEST>_<DATE_RANGE>
+  date_range_format: YYYYMMDD-YYYYMMDD
