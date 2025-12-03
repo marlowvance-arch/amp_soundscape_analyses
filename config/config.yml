@@ -58,13 +58,28 @@ gpu:
 
 analysis:
   indices:
+    progress:
+      enabled: true            # true/false
+      show_filenames: false    # live "Processing: file.wav"
+      style: "block"         # classic | block | minimal
+      color:
+        global: "cyan"
+        site: "green"
+      min_interval: 0.1        # update frequency
+      max_interval: 1.0
+      show_eta: true
+      position_global: 0
+      position_site: 1
+      
     window_seconds: 60
     fft_size: 1024
     overlap: 0.5
+
     bio_low: 200
     bio_high: 8000
     anthro_low: 20
     anthro_high: 200
+
     indices_to_compute:
       - AEI
       - ADI
@@ -76,6 +91,77 @@ analysis:
       - temporal_entropy
       - total_entropy
       - ZCR
+
+    # -----------------------------------------------------------
+    # New additions for optimized CPU index engine
+    # -----------------------------------------------------------
+
+    engine: cpu_fast         # options: cpu_fast, legacy, gpu_future
+
+    # Fast-CPU STFT parameters (NumPy-friendly)
+    stft:
+      n_fft: 4096
+      hop_length: 2048
+      window: hann
+      lowcut_hz: 100
+
+    # Frequency bands (Towsey-style + rain detection)
+    bands:
+      bio: [2000, 11000]        # insects + birds
+      anthro: [1000, 2000]
+      geophony: [0, 1000]
+      rumble: [0, 100]
+      bi_band: [2000, 8000]
+
+    # -------------------------------------------------------------------
+    # NEW CONFIGURATION FOR DYNAMIC SSI & IMPROVED RAIN DETECTION
+    # -------------------------------------------------------------------
+
+    ssi:
+      method: dynamic              # options: dynamic, fixed
+      dynamic_offset_db: 12        # Towsey (2023): threshold = median + 12 dB
+      fixed_threshold_db: -70      # used only if method = fixed
+
+    rain:
+      method: v2          # options: v2, v3
+
+      # ---- Shared Thresholds ----
+      hf_band: [6000, 12000]
+      entropy_band: [3000, 8000]
+
+      # v2 thresholds
+      hf_ratio_threshold: 0.05
+      entropy_threshold: 0.95
+      sfm_threshold: 0.85
+      votes_required: 3
+
+      # ---- v3 Morphological Model ----
+      v3:
+        vertical_streak_band: [7000, 12000]    # STFT region for streaks
+        streak_min_prominence: 2.5             # sensitivity to amplitude jumps
+        streak_min_frames: 1                   # 1–3 frame vertical edges
+        streak_weight: 1.5
+
+        roughness_kernel: 5                    # for texture (RTI)
+        roughness_weight: 1.0
+
+        lf_band: [300, 1000]                   # low-frequency drop impacts
+        lf_weight: 1.5
+
+        entropy_weight: 0.5
+        sfm_weight: 0.5
+
+        score_required: 3.5                    # decision threshold
+
+
+    # Performance options for CPU-fast engine
+    performance:
+      batch_size: 32             # files per worker
+      n_workers: auto            # or an integer
+      mmap_audio: true
+      precompute_masks: true
+      optimize_stft: true
+
 
   saturation:
     n_bins: 64
@@ -94,7 +180,7 @@ analysis:
 pipelines:
   indices:
     wrapper: pipelines/run_indices.R
-    script: scripts/indices.py
+    script: scripts/indices_fast_cpu.py
     output_folder: data/indices
 
   saturation:
