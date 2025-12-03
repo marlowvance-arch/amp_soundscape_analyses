@@ -1,58 +1,151 @@
 {
-  "version": "1.0",
-  "version_name": "ecosound_environment_v1",
-  "description": "Unified GPU-enabled ecoacoustics environment for the Florida Everglades Soundscape Monitoring Project.",
-  "system": {
-    "os": "Windows 10/11",
-    "architecture": "x86_64",
-    "gpu": "NVIDIA GeForce RTX 3050 Laptop GPU",
-    "nvidia_driver_cuda_runtime": "12.5",
-    "cuda_toolkit_installed": false
+  "environment": {
+    "project": "amp_soundscape_analyses",
+    "version": "1.2",
+    "description": "Unified CPU/GPU ecoacoustic analysis environment for AMP soundscape project."
   },
-  "python": {
-    "version": "3.10",
-    "environment_name": "ecosound",
-    "path": "C:/Users/rockn/miniconda3/envs/ecosound/python.exe"
-  },
-  "reticulate": {
-    "binding_method": "use_python",
-    "binding_path": "C:/Users/rockn/miniconda3/envs/ecosound/python.exe",
-    "status": "required_true"
-  },
-  "gpu_libraries": {
-    "cupy": {
-      "package": "cupy-cuda12x",
-      "gpu_enabled": true,
-      "tested_gpu": "NVIDIA GeForce RTX 3050 Laptop GPU"
+
+  "hardware": {
+    "cpu": {
+      "safe_mode": true,
+      "max_workers": "auto",
+      "thread_pool": true
     },
-    "pytorch": {
-      "installer": "pip",
-      "install_command": "pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121",
-      "gpu_enabled": true,
-      "cuda_version": "12.1",
-      "detected_gpu": "NVIDIA GeForce RTX 3050 Laptop GPU"
+
+    "gpu": {
+      "use_gpu": true,
+      "device_id": 0,
+      "backend": "torch",        
+      "cuda_version": "12.x",
+      "allow_fallback_to_cpu": true,
+
+      "memory": {
+        "batch_bytes": 4000000000,
+        "prefetch": true
+      }
     }
   },
-  "audio_stack": {
-    "librosa": "conda-forge",
-    "pysoundfile": "pip",
-    "audioread": "conda-forge"
+
+  "audio": {
+    "sample_rate": 24000,
+    "channel_mode": "mono_mean",
+    "lowcut_hz": 100
   },
-  "python_scripts": [
-    "indices.py",
-    "saturation.py",
-    "false_color.py",
-    "species_cnn.py"
-  ],
-  "r_wrappers": [
-    "run_indices.R",
-    "run_saturation.R",
-    "run_falsecolor.R",
-    "run_species.R"
-  ],
-  "shiny_app": "app.R",
-  "metadata": {
-    "created": "2025-02-26",
-    "created_by": "Soundscape Ecologist GPT"
+
+  "stft": {
+    "n_fft": 4096,
+    "hop_length": 2048,
+    "window": "hann",
+    "padded": false,
+    "boundary": null,
+    "gpu_fft_enabled": false
+  },
+
+  "indices": {
+    "engine": "cpu_safe",
+    "compute": [
+      "ADI","AEI","ACI","BI","NDSI",
+      "SSI","H_spectral","H_temporal",
+      "H_total","ZCR"
+    ],
+
+    "bands": {
+      "bio":       [2000, 11000],
+      "anthro":    [1000, 2000],
+      "bi_band":   [2000, 8000],
+      "geophony":  [0, 1000],
+      "rumble":    [0, 100]
+    },
+
+    "ssi": {
+      "dynamic_offset_db": -12,
+      "method": "median_power_dynamic"
+    }
+  },
+
+  "rain_model": {
+    "method": "v2",
+    "hf_band":          [6000, 12000],
+    "entropy_band":     [3000, 8000],
+    "hf_ratio_threshold": 0.05,
+    "entropy_threshold":   0.95,
+    "sfm_threshold":       0.85,
+    "votes_required":        3
+  },
+
+  "gpu_processing": {
+    "saturation": {
+      "enabled": true,
+      "bins": 64,
+      "threshold": 0.8,
+      "smooth": true,
+      "smooth_k": 7,
+      "gpu_fft": true
+    },
+
+    "false_color": {
+      "enabled": true,
+      "window_sec": 300,
+      "indices": ["ACI", "BIO", "NDSI"],
+      "cmap": "viridis",
+      "gpu_fft": true,
+      "normalize": "global"
+    },
+
+    "lts": {
+      "enabled": true,
+      "fft_size": 4096,
+      "hop_size": 2048,
+      "aggregate": "hourly",
+      "colormap": "inferno",
+      "gpu_fft": true,
+      "compression": "log_power"
+    },
+
+    "cnn_species": {
+      "enabled": true,
+      "model": "birdnet_lite",
+      "confidence_threshold": 0.6,
+      "batch_seconds": 3,
+      "overlap": 1.0,
+      "use_half_precision": true,
+      "block_gpu_on_low_memory": false
+    }
+  },
+
+  "filename_rules": {
+    "format": "<SERIAL>_<YYYYMMDD>_<HHMMSS>.wav",
+    "delimiter": "_",
+    "validate": true,
+    "components": {
+      "serial": "alphanumeric",
+      "date":   "YYYYMMDD",
+      "time":   "HHMMSS"
+    }
+  },
+
+  "output_fields": {
+    "timestamps": [
+      "serial", "date_yyyymmdd", "time_hhmmss",
+      "date_utc", "date_local", "date_str"
+    ],
+
+    "indices": [
+      "ADI", "AEI", "ACI", "BI", "NDSI",
+      "H_spectral", "H_temporal", "H_total",
+      "ZCR", "SSI"
+    ],
+
+    "rain": [
+      "flag_rain", "rain_hf_ratio", "rain_score_v2",
+      "rain_entropy", "rain_sfm"
+    ],
+
+    "gpu_products": [
+      "saturation_map",
+      "false_color_spectrogram",
+      "lts_matrix",
+      "cnn_detections"
+    ]
   }
 }
