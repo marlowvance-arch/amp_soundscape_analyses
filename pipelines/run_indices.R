@@ -1,132 +1,87 @@
 #!/usr/bin/env Rscript
 
-# =====================================================================
-# run_indices.R — ecosound GPU pipeline wrapper (final version)
-# =====================================================================
+library(reticulate)
+library(yaml)
 
-suppressPackageStartupMessages({
-  library(yaml)
-  library(reticulate)
-  library(rprojroot)
-})
+# ------------------------------------------------------------
+# 1. Activate ecosound Python
+# ------------------------------------------------------------
+use_python("C:/Users/rockn/miniconda3/envs/ecosound/python.exe", required = TRUE)
 
-message("===================================================")
-message("[ run_indices.R ]")
+# ------------------------------------------------------------
+# 2. Read master config.yml (so progress settings can apply)
+# ------------------------------------------------------------
+cfg_path <- "config/config.yml"
 
-# ---- Validate Shiny-injected variables ----
-if (!exists("sites", inherits = FALSE) || !exists("dates", inherits = FALSE)) {
-  stop("Wrapper requires variables: sites, dates")
+if (!file.exists(cfg_path)) {
+  stop("[R] config/config.yml not found — cannot continue.")
 }
 
-# ---- Locate project root ----
-root <- rprojroot::find_root(rprojroot::has_file("config/config.yml"))
-setwd(root)
-message("Project root: ", root)
+cfg <- yaml::read_yaml(cfg_path)
 
-# ---- Load config ----
-cfg <- yaml::read_yaml("config/config.yml")
+# Extract progress block if it exists
+pg <- cfg$analysis$indices$progress
 
-# ---- Resolve environment name ----
-env_name <- cfg$python$env_indices
-if (is.null(env_name) || env_name == "") {
-  stop("Missing python$env_indices in config.yml")
-}
-message("Python env: ", env_name)
+# ------------------------------------------------------------
+# 3. Apply progress settings as environment variables
+# ------------------------------------------------------------
 
-# ---- Build python.exe path for Windows ----
-python_path <- file.path(
-  Sys.getenv("USERPROFILE"),
-  "miniconda3", "envs", env_name, "python.exe"
-)
-
-if (!file.exists(python_path)) {
-  stop("Python executable not found at: ", python_path)
-}
-
-message("Python path: ", python_path)
-
-# ---- Indices script path ----
-script_path <- file.path(root, "scripts", "indices.py")
-if (!file.exists(script_path)) {
-  stop("indices.py missing at: ", script_path)
-}
-
-message("Indices script: ", script_path)
-
-# ---- Log sites and dates ----
-message("Sites: ", paste(sites, collapse = ", "))
-message("Dates: ", dates[1], " → ", dates[2])
-message("===================================================")
-
-# ---- Bind reticulate to ecosound Python ----
-reticulate::use_python(python_path, required = TRUE)
-
-# ---- GPU diagnostic ----
-message("[GPU] Checking CUDA via CuPy...")
-gpu_test <- try(reticulate::py_run_string("
-import cupy as cp
-gpu = cp.cuda.runtime.getDeviceProperties(0)['name']
-"), silent = TRUE)
-
-if (!inherits(gpu_test, "try-error")) {
-  gpu_name <- reticulate::py_eval("gpu.decode()")
-  message("[GPU] CuPy device: ", gpu_name)
+# Enable / disable progress system
+if (!is.null(pg$enabled) && pg$enabled == FALSE) {
+  Sys.setenv(AMP_PROGRESS_DISABLED = "1")
 } else {
-  message("[GPU] CuPy not available or failed — trying PyTorch...")
-  torch_test <- try(reticulate::py_run_string("
-import torch
-t = torch.cuda.is_available()
-"), silent = TRUE)
-  
-  if (!inherits(torch_test, "try-error") &&
-      reticulate::py_eval("t") == TRUE) {
-    torch_name <- reticulate::py_eval("torch.cuda.get_device_name(0)")
-    message("[GPU] Torch device: ", torch_name)
-  } else {
-    message("[GPU] No GPU backend available (running CPU-only)")
-  }
+  Sys.setenv(AMP_PROGRESS_DISABLED = "0")
 }
 
-# =====================================================================
-# RUN PYTHON INDICES SCRIPT
-# =====================================================================
-
-# Build CLI arguments
-args <- c(
-  script_path,
-  "--sites", paste(sites, collapse = ","),
-  "--start", dates[1],
-  "--end", dates[2]
-)
-
-message("[CMD] ", python_path, " ", paste(args, collapse = " "))
-message("===================================================")
-
-# Execute Python
-res <- system2(
-  command = python_path,
-  args = args,
-  stdout = TRUE,
-  stderr = TRUE
-)
-
-# Print script output line-by-line
-if (length(res) > 0) {
-  cat(paste(res, collapse = "\n"), "\n")
+# Live filename printing
+if (!is.null(pg$show_filenames) && pg$show_filenames == FALSE) {
+  Sys.setenv(AMP_SHOW_FILENAMES = "0")
+} else {
+  Sys.setenv(AMP_SHOW_FILENAMES = "1")
 }
 
-# Error handling
-status <- attr(res, "status")
-
-if (!is.null(status) && status != 0) {
-  message("===================================================")
-  message("[ERROR] indices pipeline failed")
-  message("Exit status: ", status)
-  message("Output:\n", paste(res, collapse = "\n"))
-  message("===================================================")
-  stop("Indices pipeline failed.")
+# Style override
+if (!is.null(pg$style)) {
+  Sys.setenv(AMP_PROGRESS_STYLE = pg$style)
 }
 
-message("===================================================")
-message("[SUCCESS] indices pipeline completed.")
-message("===================================================")
+# ------------------------------------------------------------
+# 4. Argument parsing (your existing logic preserved)
+# ------------------------------------------------------------
+args <- commandArgs(trailingOnly = TRUE)
+
+sites <- NULL
+start_date <- NULL
+end_date <- NULL
+
+if (length(args) == 0) {
+  message("[R] No arguments → Python auto-detection mode.")
+} else if (length(args) == 1) {
+  sites <- args[1]
+  message("[R] Sites provided: ", sites, " | Dates auto-detected.")
+} else if (length(args) == 3) {
+  sites <- args[1]
+  start_date <- args[2]
+  end_date <- args[3]
+  message("[R] Full parameters: ", sites, " ", start_date, " ", end_date)
+} else {
+  stop("Usage:\n  run_indices.R\n  run_indices.R Site_1,Site_2\n  run_indices.R Site_1,Site_2 2024-05-01 2024-05-31")
+}
+
+locals <- list()
+if (!is.null(sites))      locals$sites      <- sites
+if (!is.null(start_date)) locals$start_date <- start_date
+if (!is.null(end_date))   locals$end_date   <- end_date
+
+# ------------------------------------------------------------
+# 5. Run Python script with optional locals
+# ------------------------------------------------------------
+
+if (length(locals) == 0) {
+  message("[R] Calling Python (auto mode)...")
+  py_run_file("scripts/indices_fast_cpu.py")
+} else {
+  message("[R] Calling Python with parameters...")
+  py_run_file("scripts/indices_fast_cpu.py", local = locals)
+}
+
