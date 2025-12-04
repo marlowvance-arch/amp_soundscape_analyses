@@ -25,7 +25,7 @@ paths:
   metadata: metadata
   metadata_files:
     static_serial: metadata/static_serial_metadata.csv
-    global_flags_summary: metadata/global_flags_summary.csv
+    global_flags_summary: metadata/global_rain_flags.csv
     site_hour_blocs: metadata/site_hour_blocs.csv
   raw_audio: raw_audio
   scripts: scripts
@@ -164,10 +164,14 @@ analysis:
 
 
   saturation:
-    n_bins: 64
-    threshold: 0.8
-    smooth: yes
-    smooth_k: 7
+    fft_size: 1024
+    overlap: 0.5                 # 50% overlap
+    min_freq: 100.0              # Hz, lower bound for analysis
+    max_freq: 12000.0            # Hz, upper bound
+    noise_floor_percentile: 10.0 # percentile for noise floor per bin
+    pmn_threshold_db: 5.0        # Burivalova-style threshold (1–5 dB common)
+    min_minutes_per_hour: 1      # ignore hours with < this many minutes
+    min_minutes_per_day: 10      # ignore days with < this many minutes
 
   false_color:
     window_seconds: 300
