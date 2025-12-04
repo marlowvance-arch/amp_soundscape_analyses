@@ -1,41 +1,48 @@
 name: ecosound
 channels:
+  - defaults
   - conda-forge
   - nvidia
-  - defaults
 
 dependencies:
   # ---- Core Python ----
   - python=3.10
 
   # ---- Scientific stack ----
-  - numpy
+  # Torch 2.5.1 requires numpy < 2.0
+  - numpy<2
   - scipy
   - pandas
   - matplotlib
   - numba
+  - fftw     # optional, used by some index accelerators
 
   # ---- Audio stack ----
   - librosa
   - audioread
+
+  # ---- YAML + utilities ----
+  - pyyaml
   - pip
 
-  # ---- YAML + config ----
-  - pyyaml
+  # ---- Installed via conda-forge for stability ----
+  - soundfile
+  - tqdm
+
+  # ---- These must be installed manually AFTER env creation ----
+  #     Do NOT list them as conda deps, or Windows DLL conflicts occur.
+  #     Your wrapper handles installation if missing.
+  #
+  #     pip install torch==2.5.1+cu121 torchaudio==2.5.1+cu121 \
+  #         --index-url https://download.pytorch.org/whl/cu121
 
   - pip:
-      # ---- GPU CuPy (CUDA 12.x runtime compatible) ----
-      - cupy-cuda12x
+      # Removed CuPy (broken on Windows unless CUDA toolkit is installed)
+      # - cupy-cuda12x
 
-      # ---- Audio backend ----
-      - pysoundfile
-
-      # ---- Machine learning ----
-      # Torch GPU will be installed manually after env creation
-
-      # ---- Utils ----
-      - tqdm
+      # Machine learning (installed only if missing — handled by wrapper)
+      # These lines will NOT auto-install unless explicitly run:
+      - h5py
       - resampy
       - scikit-learn
-      - h5py
       - seaborn
